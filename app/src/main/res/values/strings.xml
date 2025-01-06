@@ -1,3 +1,7 @@
 <resources>
+
     <string name="app_name">CodeTextField</string>
+
+    <string name="main_activity_code_textfield_number">Code TextField Number</string>
+
 </resources>
