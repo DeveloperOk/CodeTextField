@@ -4,4 +4,6 @@
 
     <string name="main_activity_code_textfield_number">Code TextField Number</string>
 
+    <string name="main_activity_code_textfield_character">Code TextField Character</string>
+
 </resources>

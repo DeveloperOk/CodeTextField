@@ -56,16 +56,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             CodeTextFieldTheme {
-                NotificationApp()
+                CodeTextFieldApp()
             }
         }
     }
 }
 
 @Composable
-fun NotificationApp() {
-
-    val context = LocalContext.current
+fun CodeTextFieldApp() {
 
     Column(horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
@@ -74,14 +72,22 @@ fun NotificationApp() {
         Scaffold(modifier = Modifier.systemBarsPadding().fillMaxSize()) { innerPadding ->
 
             Column(horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.Top,
                 modifier = Modifier.padding(innerPadding).fillMaxSize()
                     .background(color = Color.White)){
 
                 val textInputNumber = remember { mutableStateOf("") }
                 Text(text = stringResource(id = R.string.main_activity_code_textfield_number))
                 Text(textInputNumber.value)
+
                 CodeTextFieldNumber(text = textInputNumber, numberOfDigits = 4)
+
+
+                val textInputCharacter = remember { mutableStateOf("") }
+                Text(text = stringResource(id = R.string.main_activity_code_textfield_character))
+                Text(textInputCharacter.value)
+
+                CodeTextFieldCharacter(text = textInputCharacter, numberOfCharacters = 5)
 
             }
 
@@ -121,7 +127,11 @@ fun CodeTextFieldNumber(text: MutableState<String>, numberOfDigits: Int){
             InputFieldNumber(digits[index].value?.toIntOrNull(), focusRequester = focusRequesters[index],
                 onFocusChanged = {},
                 onNumberChanged = { number -> digits[index].value = number.toString()
-                                                focusRequesters[(index +1).coerceIn(firstIndex, lastIndex)].requestFocus()} ,
+                                     if(number!=null) {
+                                       focusRequesters[(index + 1).coerceIn(firstIndex,lastIndex)]
+                                           .requestFocus()
+                                     }
+                                  },
                 onKeyboardBack = {focusRequesters[(index - 1).coerceIn(firstIndex, lastIndex)].requestFocus()},
                 modifier = Modifier.weight(1F).aspectRatio(1F))
 
@@ -215,3 +225,134 @@ fun InputFieldNumber(
         )
     }
 }
+
+
+@Composable
+fun CodeTextFieldCharacter(text: MutableState<String>, numberOfCharacters: Int){
+
+    val focusRequesters = remember {
+        List(numberOfCharacters) { FocusRequester() }
+    }
+
+    val characters = remember {
+        List<MutableState<String?>>(numberOfCharacters) { mutableStateOf<String?>(null) }
+    }
+
+    var output = ""
+    for (character in characters){
+
+        output = output + character.value.toString()
+
+    }
+    text.value = output
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+        modifier = Modifier.fillMaxWidth().padding(10.dp)){
+
+        val firstIndex = 0
+        val lastIndex = numberOfCharacters - 1
+
+        (firstIndex..lastIndex).forEachIndexed { index, element ->
+
+            InputFieldCharacter(characters[index].value, focusRequester = focusRequesters[index],
+                onFocusChanged = {},
+                onNumberChanged = { character -> characters[index].value = character.toString()
+                    if(!character.isNullOrEmpty()){
+                        focusRequesters[(index +1).coerceIn(firstIndex, lastIndex)].requestFocus()
+                    }
+                                  } ,
+                onKeyboardBack = {focusRequesters[(index - 1).coerceIn(firstIndex, lastIndex)].requestFocus()},
+                modifier = Modifier.weight(1F).aspectRatio(1F))
+
+        }
+    }
+
+}
+
+
+@Composable
+fun InputFieldCharacter(
+    inputCharacter: String?,
+    focusRequester: FocusRequester,
+    onFocusChanged: (Boolean) -> Unit,
+    onNumberChanged: (String?) -> Unit,
+    onKeyboardBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val text by remember(inputCharacter) {
+        mutableStateOf(
+            TextFieldValue(
+                text = inputCharacter.orEmpty(),
+                selection = TextRange(
+                    index = if(inputCharacter != null) 1 else 0
+                )
+            )
+        )
+    }
+    var isFocused by remember {
+        mutableStateOf(false)
+    }
+
+    Box(
+        modifier = modifier
+            .border(
+                width = 1.dp,
+                color = AppGreen
+            )
+            .background(AppLightGray),
+        contentAlignment = Alignment.Center
+    ) {
+        BasicTextField(
+            value = text,
+            onValueChange = { newText ->
+                var newChar = newText.text
+                if(newChar.length <= 1) {
+
+                       onNumberChanged(newChar)
+
+                }
+            },
+            cursorBrush = SolidColor(AppGreen),
+            singleLine = true,
+            textStyle = TextStyle(
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Light,
+                fontSize = 36.sp,
+                color = AppGreen
+            ),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text
+            ),
+            modifier = Modifier
+                .padding(10.dp)
+                .focusRequester(focusRequester)
+                .onFocusChanged {
+                    isFocused = it.isFocused
+                    onFocusChanged(it.isFocused)
+                }
+                .onKeyEvent { event ->
+                    val didPressDelete = event.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DEL
+                    if(didPressDelete && inputCharacter.isNullOrEmpty()) {
+                        onKeyboardBack()
+                    }
+                    false
+                },
+            decorationBox = { innerBox ->
+                innerBox()
+                if(!isFocused && inputCharacter.isNullOrEmpty()) {
+                    Text(
+                        text = "-",
+                        textAlign = TextAlign.Center,
+                        color = AppGreen,
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize()
+                    )
+                }
+            }
+        )
+    }
+}
+
