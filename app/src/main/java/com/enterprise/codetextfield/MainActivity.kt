@@ -11,11 +11,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,6 +27,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +37,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -43,27 +44,36 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.text.isDigitsOnly
+import androidx.lifecycle.ViewModelProvider
 import com.enterprise.codetextfield.ui.theme.AppGreen
 import com.enterprise.codetextfield.ui.theme.AppLightGray
 import com.enterprise.codetextfield.ui.theme.CodeTextFieldTheme
 
 class MainActivity : ComponentActivity() {
+
+    lateinit var mainViewModel: MainViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        mainViewModel = ViewModelProvider(this)[MainViewModel::class.java]
+
         setContent {
             CodeTextFieldTheme {
-                CodeTextFieldApp()
+                CodeTextFieldApp(mainViewModel = mainViewModel)
             }
         }
     }
 }
 
 @Composable
-fun CodeTextFieldApp() {
+fun CodeTextFieldApp(mainViewModel: MainViewModel) {
 
     Column(horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
@@ -76,18 +86,30 @@ fun CodeTextFieldApp() {
                 modifier = Modifier.padding(innerPadding).fillMaxSize()
                     .background(color = Color.White)){
 
-                val textInputNumber = remember { mutableStateOf("") }
+                val textInputNumber = rememberSaveable{ mutableStateOf("") }
                 Text(text = stringResource(id = R.string.main_activity_code_textfield_number))
                 Text(textInputNumber.value)
 
-                CodeTextFieldNumber(text = textInputNumber, numberOfDigits = 4)
+                CodeTextFieldNumber(text = textInputNumber,
+                        numberOfDigits = mainViewModel.numberOfDigits,
+                        focusRequesters = mainViewModel.focusRequestersForNumberInput,
+                        digits = mainViewModel.digits,
+                        digitBoxWidth = 50.dp,
+                        digitBoxHeight = 50.dp,
+                        fontSize = 30.sp)
 
 
-                val textInputCharacter = remember { mutableStateOf("") }
+                val textInputCharacter = rememberSaveable { mutableStateOf("") }
                 Text(text = stringResource(id = R.string.main_activity_code_textfield_character))
                 Text(textInputCharacter.value)
 
-                CodeTextFieldCharacter(text = textInputCharacter, numberOfCharacters = 5)
+                CodeTextFieldCharacter(text = textInputCharacter,
+                    numberOfCharacters = mainViewModel.numberOfCharacters,
+                    focusRequesters = mainViewModel.focusRequestersForCharacterInput,
+                    characters = mainViewModel.characters,
+                    characterBoxWidth = 50.dp,
+                    characterBoxHeight = 50.dp,
+                    fontSize = 25.sp)
 
             }
 
@@ -98,15 +120,15 @@ fun CodeTextFieldApp() {
 }
 
 @Composable
-fun CodeTextFieldNumber(text: MutableState<String>, numberOfDigits: Int){
-
-    val focusRequesters = remember {
-        List(numberOfDigits) { FocusRequester() }
-    }
-
-    val digits = remember {
-        List<MutableState<String?>>(numberOfDigits) { mutableStateOf<String?>(null) }
-    }
+fun CodeTextFieldNumber(
+    text: MutableState<String>,
+    numberOfDigits: Int,
+    focusRequesters: List<FocusRequester>,
+    digits: List<MutableState<String?>>,
+    digitBoxWidth: Dp,
+    digitBoxHeight: Dp,
+    fontSize: TextUnit
+){
 
     var output = ""
     for (digit in digits){
@@ -133,7 +155,9 @@ fun CodeTextFieldNumber(text: MutableState<String>, numberOfDigits: Int){
                                      }
                                   },
                 onKeyboardBack = {focusRequesters[(index - 1).coerceIn(firstIndex, lastIndex)].requestFocus()},
-                modifier = Modifier.weight(1F).aspectRatio(1F))
+                modifier = Modifier.width(digitBoxWidth).height(digitBoxHeight),
+                fontSize = fontSize
+            )
 
         }
     }
@@ -149,9 +173,10 @@ fun InputFieldNumber(
     onFocusChanged: (Boolean) -> Unit,
     onNumberChanged: (Int?) -> Unit,
     onKeyboardBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit
 ) {
-    val text by remember(number) {
+    val text by rememberSaveable(inputs = arrayOf(number), stateSaver = TextFieldValue.Saver) {
         mutableStateOf(
             TextFieldValue(
                 text = number?.toString().orEmpty(),
@@ -187,7 +212,7 @@ fun InputFieldNumber(
             textStyle = TextStyle(
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Light,
-                fontSize = 36.sp,
+                fontSize = fontSize,
                 color = AppGreen
             ),
             keyboardOptions = KeyboardOptions(
@@ -214,7 +239,7 @@ fun InputFieldNumber(
                         text = "-",
                         textAlign = TextAlign.Center,
                         color = AppGreen,
-                        fontSize = 36.sp,
+                        fontSize = fontSize,
                         fontWeight = FontWeight.Light,
                         modifier = Modifier
                             .fillMaxSize()
@@ -228,15 +253,15 @@ fun InputFieldNumber(
 
 
 @Composable
-fun CodeTextFieldCharacter(text: MutableState<String>, numberOfCharacters: Int){
-
-    val focusRequesters = remember {
-        List(numberOfCharacters) { FocusRequester() }
-    }
-
-    val characters = remember {
-        List<MutableState<String?>>(numberOfCharacters) { mutableStateOf<String?>(null) }
-    }
+fun CodeTextFieldCharacter(
+    text: MutableState<String>,
+    numberOfCharacters: Int,
+    focusRequesters: List<FocusRequester>,
+    characters: List<MutableState<String?>>,
+    characterBoxWidth: Dp,
+    characterBoxHeight: Dp,
+    fontSize: TextUnit
+){
 
     var output = ""
     for (character in characters){
@@ -262,7 +287,8 @@ fun CodeTextFieldCharacter(text: MutableState<String>, numberOfCharacters: Int){
                     }
                                   } ,
                 onKeyboardBack = {focusRequesters[(index - 1).coerceIn(firstIndex, lastIndex)].requestFocus()},
-                modifier = Modifier.weight(1F).aspectRatio(1F))
+                modifier = Modifier.width(characterBoxWidth).height(characterBoxHeight),
+                fontSize = fontSize)
 
         }
     }
@@ -277,9 +303,10 @@ fun InputFieldCharacter(
     onFocusChanged: (Boolean) -> Unit,
     onNumberChanged: (String?) -> Unit,
     onKeyboardBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit
 ) {
-    val text by remember(inputCharacter) {
+    val text by rememberSaveable(inputs = arrayOf(inputCharacter), stateSaver = TextFieldValue.Saver){
         mutableStateOf(
             TextFieldValue(
                 text = inputCharacter.orEmpty(),
@@ -317,7 +344,7 @@ fun InputFieldCharacter(
             textStyle = TextStyle(
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Light,
-                fontSize = 36.sp,
+                fontSize = fontSize,
                 color = AppGreen
             ),
             keyboardOptions = KeyboardOptions(
@@ -344,7 +371,7 @@ fun InputFieldCharacter(
                         text = "-",
                         textAlign = TextAlign.Center,
                         color = AppGreen,
-                        fontSize = 36.sp,
+                        fontSize = fontSize,
                         fontWeight = FontWeight.Light,
                         modifier = Modifier
                             .fillMaxSize()
